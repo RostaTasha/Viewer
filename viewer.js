@@ -69,16 +69,18 @@ function parseXpiksLogs(parent, text) {
 }
 
 function readAndPublish(file) {
-    var label = document.getElementById('inputlabel');
+    var namelist = document.getElementById('filenames');
     var textDisplayArea = document.getElementById('textDisplayArea');
 
     var reader = new FileReader();
 
     reader.onload = function(e) {
 	var text = reader.result;
-        parseXpiksLogs(textDisplayArea, text);
+    parseXpiksLogs(textDisplayArea, text);
 	textDisplayArea.style.visibility = "visible";
-	label.querySelector('span').innerHTML = file.name;
+	var logNameElement = document.createElement('span');
+    logNameElement.innerHTML = '<li>'+file.name+'</li>';
+    namelist.appendChild(logNameElement);
     };
 
     reader.readAsText(file);
@@ -88,18 +90,14 @@ function handleDragDrop(event) {
     event.stopPropagation();
     event.preventDefault();
 
-    var files = event.dataTransfer.files;
+    var obj = event.dataTransfer;
 
-    if (files && files.length > 0) {
+    if (obj != null) {
         var f = event.dataTransfer.files[0];
-        readAndPublish(f);
     } else {
-        var textDisplayArea = document.getElementById('textDisplayArea');
-        var text = event.dataTransfer.getData('text');
-        parseXpiksLogs(textDisplayArea, text);
-        textDisplayArea.style.visibility = "visible";
-        $(".brd").css({"visibility" : "visible"});
+		var f = event.target.files[0];
     }
+	readAndPublish(f);
 
     $('.upload-cont').css('border', '');
 }
