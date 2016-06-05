@@ -21,21 +21,46 @@ function shuffle(array) {
     return array;
 }
 
+function appendRepeatItem(parent, repeatCount, repeatType) {
+    var repeatLineP = document.createElement('p');
+    repeatLineP.setAttribute('class', repeatType + ' logitem');
+    var repeatLineText = document.createTextNode('--- Same logline was repeated ' + repeatCount + ' more time(s)');
+    repeatLineP.appendChild(repeatLineText);
+    parent.appendChild(repeatLineP);
+}
+
 function parseXpiksLogs(parent, text) {
     var lines = text.split("\n");
-    var threads_colors = ['#00897b', '#d32f2f', '#ad1457', '#7b1fa2', '#5e35b1', '#3f51b5', '#039be5', '#0097a7', '#388e3c', '#afb42b', '#fbc02d', '#8d6e63'];
+    var threads_colors = ['#00897b', '#d32f2f', '#ad1457', '#7b1fa2', '#5e35b1', '#3f51b5', '#039be5', '#0097a7', '#388e3c', '#afb42b', '#fbc02d', '#8d6e63', '#f48fb1', '#4a148c', '#880e4f', '#b71c1c', '#0d47a1', '#004d40', '#006064'];
     shuffle(threads_colors);
 
     var usedThreads = {};
     var lastUsedThreads = 0;
+    var lastLogLine = '';
+    var sameLogLinesCount = 0;
+    var lastLogType = '';
 
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
         var parts = line.split(' ');
 
-        if ((parts.length < 4) || (parts[4] !== '-')) {
+        if ((parts.length < 2) || (!strStartsWith(parts[2], 'T#'))) {
             var rawLine = document.createTextNode(line);
             parent.appendChild(rawLine);
+            continue;
+        }
+
+        var logLine = parts.slice(3).join(' ');
+        if (logLine != lastLogLine) {
+            if (sameLogLinesCount > 0) {
+                appendRepeatItem(parent, sameLogLinesCount, lastLogType);
+            }
+
+            lastLogLine = logLine;
+            lastLogType = parts[1];
+            sameLogLinesCount = 0;
+        } else {
+            sameLogLinesCount++;
             continue;
         }
 
@@ -53,7 +78,7 @@ function parseXpiksLogs(parent, text) {
         } else {
             threadColor = threads_colors[lastUsedThreads];
             usedThreads[threadID] = threadColor;
-            lastUsedThreads++;
+            lastUsedThreads = (lastUsedThreads + 1) % threads_colors.length;
         }
 
         threadIDElement.setAttribute('style', 'color: ' + threadColor);
@@ -61,26 +86,32 @@ function parseXpiksLogs(parent, text) {
         element.appendChild(threadIDElement);
 
         var logTextElement = document.createElement('span');
-        logTextElement.innerHTML = ' ' + parts.slice(3).join(' ');
+
+        logTextElement.innerHTML = ' ' + logLine;
         element.appendChild(logTextElement);
 
         parent.appendChild(element);
     }
 }
 
+function clearPreviousEntries(element) {
+    while (element.firstChild) {
+        element.removeChild(element.firstChild);
+    }
+}
+
 function readAndPublish(file) {
-    var namelist = document.getElementById('filenames');
+    var label = document.getElementById('inputlabel');
     var textDisplayArea = document.getElementById('textDisplayArea');
 
     var reader = new FileReader();
 
     reader.onload = function(e) {
 	var text = reader.result;
-    parseXpiksLogs(textDisplayArea, text);
+        clearPreviousEntries(textDisplayArea);
+        parseXpiksLogs(textDisplayArea, text);
 	textDisplayArea.style.visibility = "visible";
-	var logNameElement = document.createElement('span');
-    logNameElement.innerHTML = '<li>'+file.name+'</li>';
-    namelist.appendChild(logNameElement);
+	label.querySelector('span').innerHTML = file.name;
     };
 
     reader.readAsText(file);
@@ -90,16 +121,29 @@ function handleDragDrop(event) {
     event.stopPropagation();
     event.preventDefault();
 
-    var obj = event.dataTransfer;
+    var files = event.dataTransfer.files;
 
-    if (obj != null) {
+    if (files && files.length > 0) {
         var f = event.dataTransfer.files[0];
+        readAndPublish(f);
     } else {
-		var f = event.target.files[0];
+        var textDisplayArea = document.getElementById('textDisplayArea');
+        var text = event.dataTransfer.getData('text');
+        clearPreviousEntries(textDisplayArea);
+        parseXpiksLogs(textDisplayArea, text);
+        textDisplayArea.style.visibility = "visible";
+        $(".brd").css({"visibility" : "visible"});
     }
-	readAndPublish(f);
 
     $('.upload-cont').css('border', '');
+}
+
+function openFileDialogHandler(event) {
+    if (event.target.files &&
+        event.target.files.length) {
+        var f = event.target.files[0];
+        readAndPublish(f);
+    }
 }
 
 function handleDragOver(evt) {
@@ -113,7 +157,7 @@ window.onload = function() {
     var fileInput = document.getElementById('files');
     var dropZone = document.getElementById('box');
 
-    fileInput.addEventListener('change', handleDragDrop);
+    fileInput.addEventListener('change', openFileDialogHandler);
     dropZone.addEventListener('dragover', handleDragOver);
     dropZone.addEventListener('drop', handleDragDrop);
 
@@ -121,6 +165,7 @@ window.onload = function() {
         // Short pause to wait for paste to complete
         var textDisplayArea = document.getElementById('textDisplayArea');
 	var text = e.originalEvent.clipboardData.getData('text');
+        clearPreviousEntries(textDisplayArea);
         parseXpiksLogs(textDisplayArea, text);
         textDisplayArea.style.visibility = "visible";
         $(".brd").css({"visibility" : "visible"});
